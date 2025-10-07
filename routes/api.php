@@ -63,6 +63,7 @@ Route::middleware('auth:api')->group(function () {
     // Rutas protegidas para pruebas (CRU)
     Route::prefix('pruebas')->group(function () {
         Route::get('/', [PruebaController::class, 'index']);
+        Route::get('/my-pruebas', [PruebaController::class, 'myPruebas']); // Nueva ruta para pruebas del usuario
         Route::get('/{id}', [PruebaController::class, 'show']);
         Route::post('/', [PruebaController::class, 'store']);
         Route::put('/{id}', [PruebaController::class, 'update']);
