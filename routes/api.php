@@ -46,7 +46,7 @@ Route::middleware('auth:api')->group(function () {
     Route::prefix('veterinarias')->group(function () {
         // CRUD completo
         Route::get('/', [VeterinariaController::class, 'index']);
-        Route::get('/{id}', [VeterinariaController::class, ']);
+        Route::get('/{id}', [VeterinariaController::class, 'show']);
         Route::put('/{id}', [VeterinariaController::class, 'update']);
         Route::delete('/{id}', [VeterinariaController::class, 'destroy']);
     });
