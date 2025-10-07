@@ -407,37 +407,88 @@ class VeterinariaController extends Controller
         $isUpdate = !is_null($id);
         
         $rules = [
-            'veterinaria' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'responsable' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'direccion' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
-            'telefono' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:20',
-            'email' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
+            'veterinaria' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:255'
+            ]),
+            'responsable' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:255'
+            ]),
+            'direccion' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string'
+            ]),
+            'telefono' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:20'
+            ]),
+            'email' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('veterinarias')->ignore($id),
                 Rule::unique('users')->ignore($id)
-            ],
-            'registro_oficial_veterinario' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'ciudad' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'provincia_departamento' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'pais' => [($isUpdate ? 'sometimes|' : '') . 'required', Rule::in(Veterinaria::getPaisesValidos())],
+            ]),
+            'registro_oficial_veterinario' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:255'
+            ]),
+            'ciudad' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:255'
+            ]),
+            'provincia_departamento' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'string',
+                'max:255'
+            ]),
+            'pais' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                Rule::in(Veterinaria::getPaisesValidos())
+            ]),
             // Aceptar archivo o URL para logo: se valida en el controlador según caso
-            'logo' => ($isUpdate ? 'sometimes|' : '') . 'nullable',
-            'usuario' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
+            'logo' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'nullable'
+            ]),
+            'usuario' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
                 'string',
                 'max:255',
                 Rule::unique('veterinarias')->ignore($id)
-            ],
-            'acepta_terminos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
-            'acepta_tratamiento_datos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
+            ]),
+            'acepta_terminos' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'boolean'
+            ]),
+            'acepta_tratamiento_datos' => array_filter([
+                $isUpdate ? 'sometimes' : null,
+                'required',
+                'boolean'
+            ]),
         ];
 
         // Solo validar contraseña en creación o si se proporciona en actualización
         if (!$id || $request->filled('password')) {
-            $rules['password'] = 'required|string|min:8';
-            $rules['repetir_password'] = 'required|string|min:8';
+            $rules['password'] = ['required', 'string', 'min:8'];
+            $rules['repetir_password'] = ['required', 'string', 'min:8'];
         }
 
         return Validator::make($request->all(), $rules);
