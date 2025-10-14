@@ -44,6 +44,11 @@ return [
             'driver' => 'sanctum',
             'provider' => 'veterinarias',
         ],
+        // NUEVO: guard para admin usando users
+        'admin' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*

@@ -21,6 +21,21 @@ class VeterinariaController extends Controller
     {
         $query = Veterinaria::query();
 
+        // Control de acceso por rol/guard:
+        $actor = $request->user();
+        if ($actor instanceof User) {
+            // Admin: acceso total (verifica rol por seguridad)
+            if (!$actor->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        } else {
+            // Veterinaria: solo su propio registro
+            $query->where('id', $actor->id);
+        }
+
         // Filtros opcionales
         if ($request->has('pais')) {
             $query->porPais($request->pais);
@@ -228,6 +243,23 @@ class VeterinariaController extends Controller
      */
     public function show(string $id): JsonResponse
     {
+        $actor = request()->user();
+        if ($actor instanceof User) {
+            if (!$actor->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        } else {
+            if ((int) $id !== (int) $actor->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        }
+
         $veterinaria = Veterinaria::find($id);
 
         if (!$veterinaria) {
@@ -249,6 +281,23 @@ class VeterinariaController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        $actor = $request->user();
+        if ($actor instanceof User) {
+            if (!$actor->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        } else {
+            if ((int) $id !== (int) $actor->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        }
+
         $veterinaria = Veterinaria::find($id);
 
         if (!$veterinaria) {
@@ -359,6 +408,23 @@ class VeterinariaController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
+        $actor = request()->user();
+        if ($actor instanceof User) {
+            if (!$actor->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        } else {
+            if ((int) $id !== (int) $actor->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No autorizado'
+                ], 403);
+            }
+        }
+
         $veterinaria = Veterinaria::find($id);
 
         if (!$veterinaria) {
@@ -407,88 +473,37 @@ class VeterinariaController extends Controller
         $isUpdate = !is_null($id);
         
         $rules = [
-            'veterinaria' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:255'
-            ]),
-            'responsable' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:255'
-            ]),
-            'direccion' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string'
-            ]),
-            'telefono' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:20'
-            ]),
-            'email' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
+            'veterinaria' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'responsable' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'direccion' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
+            'telefono' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:20',
+            'email' => [
+                ($isUpdate ? 'sometimes|' : '') . 'required',
                 'email',
                 'max:255',
                 Rule::unique('veterinarias')->ignore($id),
                 Rule::unique('users')->ignore($id)
-            ]),
-            'registro_oficial_veterinario' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:255'
-            ]),
-            'ciudad' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:255'
-            ]),
-            'provincia_departamento' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'string',
-                'max:255'
-            ]),
-            'pais' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                Rule::in(Veterinaria::getPaisesValidos())
-            ]),
+            ],
+            'registro_oficial_veterinario' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'ciudad' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'provincia_departamento' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
+            'pais' => [($isUpdate ? 'sometimes|' : '') . 'required', Rule::in(Veterinaria::getPaisesValidos())],
             // Aceptar archivo o URL para logo: se valida en el controlador según caso
-            'logo' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'nullable'
-            ]),
-            'usuario' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
+            'logo' => ($isUpdate ? 'sometimes|' : '') . 'nullable',
+            'usuario' => [
+                ($isUpdate ? 'sometimes|' : '') . 'required',
                 'string',
                 'max:255',
                 Rule::unique('veterinarias')->ignore($id)
-            ]),
-            'acepta_terminos' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'boolean'
-            ]),
-            'acepta_tratamiento_datos' => array_filter([
-                $isUpdate ? 'sometimes' : null,
-                'required',
-                'boolean'
-            ]),
+            ],
+            'acepta_terminos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
+            'acepta_tratamiento_datos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
         ];
 
         // Solo validar contraseña en creación o si se proporciona en actualización
         if (!$id || $request->filled('password')) {
-            $rules['password'] = ['required', 'string', 'min:8'];
-            $rules['repetir_password'] = ['required', 'string', 'min:8'];
+            $rules['password'] = 'required|string|min:8';
+            $rules['repetir_password'] = 'required|string|min:8';
         }
 
         return Validator::make($request->all(), $rules);
