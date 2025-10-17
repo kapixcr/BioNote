@@ -82,7 +82,7 @@ Route::prefix('users')->group(function () {
 Route::prefix('pruebas')->group(function () {
     Route::get('/', [PruebaController::class, 'index']);
     Route::get('/{id}', [PruebaController::class, 'show'])->whereNumber('id');
-    Route::get('/my-pruebas', [PruebaController::class, 'myPruebas'])->middleware('auth:admin');
+    Route::get('/my-pruebas', [PruebaController::class, 'myPruebas'])->middleware('auth:api,admin');
     Route::post('/', [PruebaController::class, 'store']);
     Route::put('/{id}', [PruebaController::class, 'update'])->whereNumber('id');
     Route::delete('/{id}', [PruebaController::class, 'destroy'])->whereNumber('id');

@@ -276,18 +276,21 @@ class PruebaController extends Controller
                 'message' => 'Usuario no autenticado'
             ], 401);
         }
-        // Bloquear acceso si es admin
-        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+        // Bloquear acceso si es admin (solo para usuarios del modelo User)
+        if ($user instanceof \App\Models\User && $user->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'No autorizado'
             ], 403);
         }
+        
+        // Para veterinarias, usar su propio ID como user_id en las pruebas
+        $userId = $user instanceof \App\Models\User ? $user->id : $user->id;
 
         $perPage = (int)($request->query('per_page', 15));
         
         // Crear query base filtrado por el usuario autenticado
-        $query = Prueba::where('user_id', $user->id);
+        $query = Prueba::where('user_id', $userId);
 
         // Aplicar filtros adicionales si se proporcionan
         if ($request->filled('especie')) {
@@ -316,7 +319,8 @@ class PruebaController extends Controller
         return response()->json([
             'success' => true,
             'data' => $pruebas,
-            'user_id' => $user->id
+            'user_id' => $userId,
+            'user_type' => $user instanceof \App\Models\User ? 'user' : 'veterinaria'
         ]);
     }
     /**
