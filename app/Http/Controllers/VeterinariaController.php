@@ -714,33 +714,63 @@ class VeterinariaController extends Controller
         // Para actualizaciones, solo validar campos que se están enviando
         $isUpdate = !is_null($id);
         
-        $rules = [
-            'veterinaria' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'responsable' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'direccion' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
-            'telefono' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:20',
-            'email' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
-                'email',
-                'max:255',
-                Rule::unique('veterinarias')->ignore($id),
-                Rule::unique('users')->ignore($id)
-            ],
-            'registro_oficial_veterinario' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'ciudad' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'provincia_departamento' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'pais' => [($isUpdate ? 'sometimes|' : '') . 'required', Rule::in(Veterinaria::getPaisesValidos())],
-            // Aceptar archivo o URL para logo: se valida en el controlador según caso
-            'logo' => ($isUpdate ? 'sometimes|' : '') . 'nullable',
-            'usuario' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
-                'string',
-                'max:255',
-                Rule::unique('veterinarias')->ignore($id)
-            ],
-            'acepta_terminos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
-            'acepta_tratamiento_datos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
-        ];
+        if ($isUpdate) {
+            $rules = [
+                'veterinaria' => 'sometimes|required|string|max:255',
+                'responsable' => 'sometimes|required|string|max:255',
+                'direccion' => 'sometimes|required|string',
+                'telefono' => 'sometimes|required|string|max:20',
+                'email' => [
+                    'sometimes',
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('veterinarias')->ignore($id),
+                    Rule::unique('users')->ignore($id)
+                ],
+                'registro_oficial_veterinario' => 'sometimes|required|string|max:255',
+                'ciudad' => 'sometimes|required|string|max:255',
+                'provincia_departamento' => 'sometimes|required|string|max:255',
+                'pais' => ['sometimes', 'required', Rule::in(Veterinaria::getPaisesValidos())],
+                'logo' => 'sometimes|nullable',
+                'usuario' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('veterinarias')->ignore($id)
+                ],
+                'acepta_terminos' => 'sometimes|required|boolean',
+                'acepta_tratamiento_datos' => 'sometimes|required|boolean',
+            ];
+        } else {
+            $rules = [
+                'veterinaria' => 'required|string|max:255',
+                'responsable' => 'required|string|max:255',
+                'direccion' => 'required|string',
+                'telefono' => 'required|string|max:20',
+                'email' => [
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('veterinarias'),
+                    Rule::unique('users')
+                ],
+                'registro_oficial_veterinario' => 'required|string|max:255',
+                'ciudad' => 'required|string|max:255',
+                'provincia_departamento' => 'required|string|max:255',
+                'pais' => ['required', Rule::in(Veterinaria::getPaisesValidos())],
+                'logo' => 'nullable',
+                'usuario' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('veterinarias')
+                ],
+                'acepta_terminos' => 'required|boolean',
+                'acepta_tratamiento_datos' => 'required|boolean',
+            ];
+        }
 
         // Solo validar contraseña en creación o si se proporciona en actualización
         if (!$id || $request->filled('password')) {
