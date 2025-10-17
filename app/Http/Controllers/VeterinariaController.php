@@ -99,40 +99,95 @@ class VeterinariaController extends Controller
         $data['password'] = $hashedPassword;
         
         // Manejo mejorado de logo: aceptar archivo o URL
-        if ($request->hasFile('logo') && $request->file('logo')->isValid()) {
+        // Verificar múltiples formas de detectar archivos desde Flutter
+        $hasLogoFile = $request->hasFile('logo') || 
+                       (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK);
+        
+        \Log::info('Logo file detection:', [
+            'hasFile_logo' => $request->hasFile('logo'),
+            'files_logo_exists' => isset($_FILES['logo']),
+            'files_logo_error' => $_FILES['logo']['error'] ?? 'not_set',
+            'hasLogoFile' => $hasLogoFile
+        ]);
+        
+        if ($hasLogoFile && ($request->hasFile('logo') ? $request->file('logo')->isValid() : true)) {
             try {
-                // Validar archivo de imagen
-                $request->validate([
-                    'logo' => 'required|image|mimes:jpg,jpeg,png,gif,svg,webp|max:5120' // 5MB máximo
+                // Obtener archivo de diferentes maneras según como lo envíe Flutter
+                $logoFile = null;
+                $originalName = '';
+                $mimeType = '';
+                $fileSize = 0;
+                $tempPath = '';
+                
+                if ($request->hasFile('logo')) {
+                    // Método estándar de Laravel
+                    $logoFile = $request->file('logo');
+                    $originalName = $logoFile->getClientOriginalName();
+                    $mimeType = $logoFile->getMimeType();
+                    $fileSize = $logoFile->getSize();
+                    $tempPath = $logoFile->getPathname();
+                } elseif (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+                    // Método directo de PHP para casos donde Laravel no detecta el archivo
+                    $originalName = $_FILES['logo']['name'];
+                    $mimeType = $_FILES['logo']['type'];
+                    $fileSize = $_FILES['logo']['size'];
+                    $tempPath = $_FILES['logo']['tmp_name'];
+                }
+                
+                // Log adicional para debugging
+                \Log::info('File detected for update:', [
+                    'original_name' => $originalName,
+                    'mime_type' => $mimeType,
+                    'size' => $fileSize,
+                    'temp_path' => $tempPath,
+                    'method' => $logoFile ? 'laravel' : 'php_direct'
                 ]);
-
-                $logoFile = $request->file('logo');
+                
+                // Verificar que tenemos un archivo válido
+                if (empty($tempPath) || !file_exists($tempPath)) {
+                    throw new \Exception('No se pudo acceder al archivo subido');
+                }
+                
+                // Verificar tamaño del archivo (5MB máximo)
+                if ($fileSize > 5120 * 1024) {
+                    throw new \Exception('El archivo es demasiado grande. Máximo 5MB permitido');
+                }
+                
+                if ($fileSize === 0) {
+                    throw new \Exception('El archivo está vacío');
+                }
+                
+                // Validación adicional del tipo de archivo basada en extensión
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
+                $allowedMimeTypes = [
+                    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
+                    'image/svg+xml', 'image/webp', 'application/octet-stream'
+                ];
+                
+                // Obtener extensión del nombre original
+                $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                
+                // Verificar extensión
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('Tipo de archivo no permitido. Solo se permiten: ' . implode(', ', $allowedExtensions));
+                }
+                
+                // Verificar MIME type (más flexible)
+                if (!in_array($mimeType, $allowedMimeTypes)) {
+                    throw new \Exception('Tipo MIME no permitido: ' . $mimeType);
+                }
                 
                 // Debug: Verificar propiedades del archivo
                 \Log::info('Logo file info:', [
-                    'original_name' => $logoFile->getClientOriginalName(),
-                    'mime_type' => $logoFile->getMimeType(),
-                    'size' => $logoFile->getSize(),
-                    'path' => $logoFile->getPathname(),
-                    'is_valid' => $logoFile->isValid(),
-                    'error' => $logoFile->getError()
+                    'original_name' => $originalName,
+                    'mime_type' => $mimeType,
+                    'size' => $fileSize,
+                    'temp_path' => $tempPath
                 ]);
                 
-                // Verificar que el archivo es válido
-                if (!$logoFile->isValid()) {
-                    throw new \Exception('El archivo de logo no es válido. Error: ' . $logoFile->getError());
-                }
-                
-                // Verificar que el archivo tiene contenido
-                if ($logoFile->getSize() === 0) {
-                    throw new \Exception('El archivo de logo está vacío');
-                }
-                
                 // Obtener extensión de forma segura
-                $extension = $logoFile->getClientOriginalExtension();
                 if (empty($extension)) {
                     // Fallback: obtener extensión desde el mime type
-                    $mimeType = $logoFile->getMimeType();
                     $extension = match($mimeType) {
                         'image/jpeg' => 'jpg',
                         'image/png' => 'png',
@@ -160,7 +215,7 @@ class VeterinariaController extends Controller
                 // Mover el archivo manualmente
                 $fullPath = $destinationPath . DIRECTORY_SEPARATOR . $filename;
                 
-                if (move_uploaded_file($logoFile->getPathname(), $fullPath)) {
+                if (move_uploaded_file($tempPath, $fullPath)) {
                     $path = 'logos/' . $filename;
                     \Log::info('File moved successfully to: ' . $fullPath);
                 } else {
@@ -281,9 +336,18 @@ class VeterinariaController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        // Log de entrada para verificar que la request llega al método
+        \Log::info('=== UPDATE METHOD CALLED ===', [
+            'veterinaria_id' => $id,
+            'timestamp' => now(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->header('User-Agent')
+        ]);
+        
         $actor = $request->user();
         if ($actor instanceof User) {
             if (!$actor->isAdmin()) {
+                \Log::warning('Update failed: User not admin');
                 return response()->json([
                     'success' => false,
                     'message' => 'No autorizado'
@@ -291,6 +355,7 @@ class VeterinariaController extends Controller
             }
         } else {
             if ((int) $id !== (int) $actor->id) {
+                \Log::warning('Update failed: Veterinaria ID mismatch');
                 return response()->json([
                     'success' => false,
                     'message' => 'No autorizado'
@@ -320,6 +385,36 @@ class VeterinariaController extends Controller
         $data = $request->except(['repetir_password', 'password']);
         $hashedPassword = null;
 
+        // Debug: Log de información detallada del request
+        \Log::info('=== UPDATE REQUEST DEBUG START ===');
+        \Log::info('Update request debug info:', [
+            'veterinaria_id' => $id,
+            'has_file_logo' => $request->hasFile('logo'),
+            'filled_logo' => $request->filled('logo'),
+            'all_files' => $request->allFiles(),
+            'all_input' => $request->except(['password', 'repetir_password']),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method(),
+            'raw_files' => $_FILES,
+            'request_size' => $request->header('Content-Length'),
+            'user_agent' => $request->header('User-Agent')
+        ]);
+        
+        // Log específico de $_FILES para debugging
+        if (isset($_FILES['logo'])) {
+            \Log::info('$_FILES[logo] details:', [
+                'name' => $_FILES['logo']['name'] ?? 'not_set',
+                'type' => $_FILES['logo']['type'] ?? 'not_set', 
+                'size' => $_FILES['logo']['size'] ?? 'not_set',
+                'tmp_name' => $_FILES['logo']['tmp_name'] ?? 'not_set',
+                'error' => $_FILES['logo']['error'] ?? 'not_set',
+                'error_message' => $this->getUploadErrorMessage($_FILES['logo']['error'] ?? -1)
+            ]);
+        } else {
+            \Log::info('$_FILES[logo] not found in request');
+        }
+        \Log::info('=== UPDATE REQUEST DEBUG END ===');
+
         // Solo actualizar contraseña si se proporciona
         if ($request->filled('password')) {
             if ($request->password !== $request->repetir_password) {
@@ -332,15 +427,153 @@ class VeterinariaController extends Controller
             $data['password'] = $hashedPassword;
         }
 
-        // Manejo de logo: aceptar archivo o URL
-        if ($request->hasFile('logo')) {
-            // Validar y almacenar archivo de imagen en storage/public/logos
-            $request->validate([
-                'logo' => 'image|mimes:jpg,jpeg,png,gif,svg,webp|max:5120'
-            ]);
-            $filename = time() . '_' . uniqid() . '.' . $request->file('logo')->getClientOriginalExtension();
-            $path = $request->file('logo')->storeAs('logos', $filename, 'public');
-            $data['logo'] = $filename;
+        // Manejo mejorado de logo: aceptar archivo o URL
+        // Verificar múltiples formas de detectar archivos desde Flutter
+        $hasLogoFile = $request->hasFile('logo') || 
+                       (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK);
+        
+        \Log::info('Logo file detection (update):', [
+            'hasFile_logo' => $request->hasFile('logo'),
+            'files_logo_exists' => isset($_FILES['logo']),
+            'files_logo_error' => $_FILES['logo']['error'] ?? 'not_set',
+            'hasLogoFile' => $hasLogoFile
+        ]);
+        
+        if ($hasLogoFile && ($request->hasFile('logo') ? $request->file('logo')->isValid() : true)) {
+            try {
+                // Obtener archivo de diferentes maneras según como lo envíe Flutter
+                $logoFile = null;
+                $originalName = '';
+                $mimeType = '';
+                $fileSize = 0;
+                $tempPath = '';
+                
+                if ($request->hasFile('logo')) {
+                    // Método estándar de Laravel
+                    $logoFile = $request->file('logo');
+                    $originalName = $logoFile->getClientOriginalName();
+                    $mimeType = $logoFile->getMimeType();
+                    $fileSize = $logoFile->getSize();
+                    $tempPath = $logoFile->getPathname();
+                } elseif (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+                    // Método directo de PHP para casos donde Laravel no detecta el archivo
+                    $originalName = $_FILES['logo']['name'];
+                    $mimeType = $_FILES['logo']['type'];
+                    $fileSize = $_FILES['logo']['size'];
+                    $tempPath = $_FILES['logo']['tmp_name'];
+                }
+                
+                // Log adicional para debugging
+                \Log::info('File detected for update:', [
+                    'original_name' => $originalName,
+                    'mime_type' => $mimeType,
+                    'size' => $fileSize,
+                    'temp_path' => $tempPath,
+                    'method' => $logoFile ? 'laravel' : 'php_direct'
+                ]);
+                
+                // Verificar que tenemos un archivo válido
+                if (empty($tempPath) || !file_exists($tempPath)) {
+                    throw new \Exception('No se pudo acceder al archivo subido');
+                }
+                
+                // Verificar tamaño del archivo (5MB máximo)
+                if ($fileSize > 5120 * 1024) {
+                    throw new \Exception('El archivo es demasiado grande. Máximo 5MB permitido');
+                }
+                
+                if ($fileSize === 0) {
+                    throw new \Exception('El archivo está vacío');
+                }
+                
+                // Validación adicional del tipo de archivo basada en extensión
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
+                $allowedMimeTypes = [
+                    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
+                    'image/svg+xml', 'image/webp', 'application/octet-stream'
+                ];
+                
+                // Obtener extensión del nombre original
+                $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                
+                // Verificar extensión
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('Tipo de archivo no permitido. Solo se permiten: ' . implode(', ', $allowedExtensions));
+                }
+                
+                // Verificar MIME type (más flexible)
+                if (!in_array($mimeType, $allowedMimeTypes)) {
+                    throw new \Exception('Tipo MIME no permitido: ' . $mimeType);
+                }
+                
+                // Obtener extensión de forma segura
+                if (empty($extension)) {
+                    // Fallback: obtener extensión desde el mime type
+                    $extension = match($mimeType) {
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                        'image/gif' => 'gif',
+                        'image/svg+xml' => 'svg',
+                        'image/webp' => 'webp',
+                        default => 'jpg'
+                    };
+                }
+                
+                // Generar nombre único para el archivo
+                $filename = time() . '_' . uniqid() . '.' . $extension;
+                
+                // Crear directorio si no existe
+                Storage::disk('public')->makeDirectory('logos');
+                
+                // Método alternativo: usar move en lugar de putFileAs
+                $destinationPath = storage_path('app/public/logos');
+                
+                // Asegurar que el directorio existe
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0755, true);
+                }
+                
+                // Eliminar logo anterior si existe y no es una URL
+                if ($veterinaria->logo && !filter_var($veterinaria->logo, FILTER_VALIDATE_URL)) {
+                    $oldLogoPath = $destinationPath . DIRECTORY_SEPARATOR . $veterinaria->logo;
+                    if (file_exists($oldLogoPath)) {
+                        unlink($oldLogoPath);
+                        \Log::info('Old logo deleted: ' . $oldLogoPath);
+                    }
+                }
+                
+                // Mover el archivo manualmente
+                $fullPath = $destinationPath . DIRECTORY_SEPARATOR . $filename;
+                
+                if (move_uploaded_file($tempPath, $fullPath)) {
+                    $path = 'logos/' . $filename;
+                    \Log::info('File moved successfully to: ' . $fullPath);
+                } else {
+                    throw new \Exception('Error al mover el archivo de logo');
+                }
+                
+                // Verificar que el archivo se guardó correctamente
+                if (!file_exists($fullPath)) {
+                    throw new \Exception('Error: el archivo no se encontró después de guardarlo en: ' . $fullPath);
+                }
+                
+                // Guardar solo el nombre del archivo para compatibilidad con el accessor
+                $data['logo'] = $filename;
+                
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $e->errors(),
+                    'message' => 'Error de validación del archivo'
+                ], 422);
+            } catch (\Exception $e) {
+                \Log::error('Error uploading logo (update): ' . $e->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['logo' => ['Error al procesar el archivo de logo: ' . $e->getMessage()]],
+                    'message' => 'Error al subir el logo'
+                ], 422);
+            }
         } elseif ($request->filled('logo')) {
             // Validar URL remota
             if (!filter_var($request->logo, FILTER_VALIDATE_URL)) {
@@ -395,6 +628,15 @@ class VeterinariaController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
+            
+            // Si hubo error y se subió un archivo, eliminarlo
+            if (isset($data['logo']) && !filter_var($data['logo'], FILTER_VALIDATE_URL)) {
+                $logoPath = storage_path('app/public/logos/' . $data['logo']);
+                if (file_exists($logoPath)) {
+                    unlink($logoPath);
+                    \Log::info('Logo file deleted due to rollback: ' . $logoPath);
+                }
+            }
             
             return response()->json([
                 'success' => false,
@@ -472,33 +714,63 @@ class VeterinariaController extends Controller
         // Para actualizaciones, solo validar campos que se están enviando
         $isUpdate = !is_null($id);
         
-        $rules = [
-            'veterinaria' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'responsable' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'direccion' => ($isUpdate ? 'sometimes|' : '') . 'required|string',
-            'telefono' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:20',
-            'email' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
-                'email',
-                'max:255',
-                Rule::unique('veterinarias')->ignore($id),
-                Rule::unique('users')->ignore($id)
-            ],
-            'registro_oficial_veterinario' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'ciudad' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'provincia_departamento' => ($isUpdate ? 'sometimes|' : '') . 'required|string|max:255',
-            'pais' => [($isUpdate ? 'sometimes|' : '') . 'required', Rule::in(Veterinaria::getPaisesValidos())],
-            // Aceptar archivo o URL para logo: se valida en el controlador según caso
-            'logo' => ($isUpdate ? 'sometimes|' : '') . 'nullable',
-            'usuario' => [
-                ($isUpdate ? 'sometimes|' : '') . 'required',
-                'string',
-                'max:255',
-                Rule::unique('veterinarias')->ignore($id)
-            ],
-            'acepta_terminos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
-            'acepta_tratamiento_datos' => ($isUpdate ? 'sometimes|' : '') . 'required|boolean',
-        ];
+        if ($isUpdate) {
+            $rules = [
+                'veterinaria' => 'sometimes|required|string|max:255',
+                'responsable' => 'sometimes|required|string|max:255',
+                'direccion' => 'sometimes|required|string',
+                'telefono' => 'sometimes|required|string|max:20',
+                'email' => [
+                    'sometimes',
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('veterinarias')->ignore($id),
+                    Rule::unique('users')->ignore($id)
+                ],
+                'registro_oficial_veterinario' => 'sometimes|required|string|max:255',
+                'ciudad' => 'sometimes|required|string|max:255',
+                'provincia_departamento' => 'sometimes|required|string|max:255',
+                'pais' => ['sometimes', 'required', Rule::in(Veterinaria::getPaisesValidos())],
+                'logo' => 'sometimes|nullable',
+                'usuario' => [
+                    'sometimes',
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('veterinarias')->ignore($id)
+                ],
+                'acepta_terminos' => 'sometimes|required|boolean',
+                'acepta_tratamiento_datos' => 'sometimes|required|boolean',
+            ];
+        } else {
+            $rules = [
+                'veterinaria' => 'required|string|max:255',
+                'responsable' => 'required|string|max:255',
+                'direccion' => 'required|string',
+                'telefono' => 'required|string|max:20',
+                'email' => [
+                    'required',
+                    'email',
+                    'max:255',
+                    Rule::unique('veterinarias'),
+                    Rule::unique('users')
+                ],
+                'registro_oficial_veterinario' => 'required|string|max:255',
+                'ciudad' => 'required|string|max:255',
+                'provincia_departamento' => 'required|string|max:255',
+                'pais' => ['required', Rule::in(Veterinaria::getPaisesValidos())],
+                'logo' => 'nullable',
+                'usuario' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('veterinarias')
+                ],
+                'acepta_terminos' => 'required|boolean',
+                'acepta_tratamiento_datos' => 'required|boolean',
+            ];
+        }
 
         // Solo validar contraseña en creación o si se proporciona en actualización
         if (!$id || $request->filled('password')) {
@@ -521,5 +793,23 @@ class VeterinariaController extends Controller
             'data' => Veterinaria::getPaisesValidos(),
             'message' => 'Países obtenidos exitosamente'
         ]);
+    }
+
+    /**
+     * Obtener mensaje de error de upload
+     */
+    private function getUploadErrorMessage($errorCode): string
+    {
+        return match($errorCode) {
+            UPLOAD_ERR_OK => 'No error',
+            UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
+            UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+            UPLOAD_ERR_EXTENSION => 'File upload stopped by extension',
+            default => 'Unknown error code: ' . $errorCode
+        };
     }
 }
