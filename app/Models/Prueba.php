@@ -29,6 +29,7 @@ class Prueba extends Model
     protected $casts = [
         'fecha' => 'date',
         'result_prueba' => 'array',
+        'titulacion' => 'array',
         'fotos' => 'array',
     ];
 

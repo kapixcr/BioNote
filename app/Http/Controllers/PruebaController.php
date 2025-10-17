@@ -75,10 +75,9 @@ class PruebaController extends Controller
             'sexo' => ['required', 'string', 'max:50'],
             'raza' => ['required', 'string', 'max:100'],
             'edad' => ['required', 'integer', 'min:0'],
-            'nombre_prueba' => ['required', 'string', 'max:150'],   
+            'nombre_prueba' => ['required', 'string', 'max:150'],
             'result_prueba' => ['nullable', 'array'],
-            'titulacion' => ['required', 'string', 'max:150'],
-            'result_titulacion' => ['required', 'string', 'max:150'],
+            'titulacion' => ['required', 'array'],
             // 'fotos' se maneja como archivos en multipart/form-data; validación específica abajo
             'fotos' => ['nullable', 'array'],
         ]);
@@ -222,8 +221,7 @@ class PruebaController extends Controller
             'edad' => ['sometimes', 'integer', 'min:0'],
             'nombre_prueba' => ['sometimes', 'string', 'max:150'],
             'result_prueba' => ['sometimes', 'array'],
-            'titulacion' => ['sometimes', 'string', 'max:150'],
-            'result_titulacion' => ['sometimes', 'string', 'max:150'],
+            'titulacion' => ['sometimes', 'array'],
             // 'fotos' como archivos en multipart/form-data; validación específica abajo
             'fotos' => ['nullable'],
         ]);
