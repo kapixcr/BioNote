@@ -175,16 +175,14 @@ class VeterinariaController extends Controller
                 // Verificar MIME type (más flexible)
                 if (!in_array($mimeType, $allowedMimeTypes)) {
                     throw new \Exception('Tipo MIME no permitido: ' . $mimeType);
-                }}
+                }
                 
                 // Debug: Verificar propiedades del archivo
                 \Log::info('Logo file info:', [
-                    'original_name' => $logoFile->getClientOriginalName(),
-                    'mime_type' => $logoFile->getMimeType(),
-                    'size' => $logoFile->getSize(),
-                    'path' => $logoFile->getPathname(),
-                    'is_valid' => $logoFile->isValid(),
-                    'error' => $logoFile->getError()
+                    'original_name' => $originalName,
+                    'mime_type' => $mimeType,
+                    'size' => $fileSize,
+                    'temp_path' => $tempPath
                 ]);
                 
                 // Obtener extensión de forma segura
