@@ -99,14 +99,83 @@ class VeterinariaController extends Controller
         $data['password'] = $hashedPassword;
         
         // Manejo mejorado de logo: aceptar archivo o URL
-        if ($request->hasFile('logo') && $request->file('logo')->isValid()) {
+        // Verificar múltiples formas de detectar archivos desde Flutter
+        $hasLogoFile = $request->hasFile('logo') || 
+                       (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK);
+        
+        \Log::info('Logo file detection:', [
+            'hasFile_logo' => $request->hasFile('logo'),
+            'files_logo_exists' => isset($_FILES['logo']),
+            'files_logo_error' => $_FILES['logo']['error'] ?? 'not_set',
+            'hasLogoFile' => $hasLogoFile
+        ]);
+        
+        if ($hasLogoFile && ($request->hasFile('logo') ? $request->file('logo')->isValid() : true)) {
             try {
-                // Validar archivo de imagen
-                $request->validate([
-                    'logo' => 'required|image|mimes:jpg,jpeg,png,gif,svg,webp|max:5120' // 5MB máximo
+                // Obtener archivo de diferentes maneras según como lo envíe Flutter
+                $logoFile = null;
+                $originalName = '';
+                $mimeType = '';
+                $fileSize = 0;
+                $tempPath = '';
+                
+                if ($request->hasFile('logo')) {
+                    // Método estándar de Laravel
+                    $logoFile = $request->file('logo');
+                    $originalName = $logoFile->getClientOriginalName();
+                    $mimeType = $logoFile->getMimeType();
+                    $fileSize = $logoFile->getSize();
+                    $tempPath = $logoFile->getPathname();
+                } elseif (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+                    // Método directo de PHP para casos donde Laravel no detecta el archivo
+                    $originalName = $_FILES['logo']['name'];
+                    $mimeType = $_FILES['logo']['type'];
+                    $fileSize = $_FILES['logo']['size'];
+                    $tempPath = $_FILES['logo']['tmp_name'];
+                }
+                
+                // Log adicional para debugging
+                \Log::info('File detected for update:', [
+                    'original_name' => $originalName,
+                    'mime_type' => $mimeType,
+                    'size' => $fileSize,
+                    'temp_path' => $tempPath,
+                    'method' => $logoFile ? 'laravel' : 'php_direct'
                 ]);
-
-                $logoFile = $request->file('logo');
+                
+                // Verificar que tenemos un archivo válido
+                if (empty($tempPath) || !file_exists($tempPath)) {
+                    throw new \Exception('No se pudo acceder al archivo subido');
+                }
+                
+                // Verificar tamaño del archivo (5MB máximo)
+                if ($fileSize > 5120 * 1024) {
+                    throw new \Exception('El archivo es demasiado grande. Máximo 5MB permitido');
+                }
+                
+                if ($fileSize === 0) {
+                    throw new \Exception('El archivo está vacío');
+                }
+                
+                // Validación adicional del tipo de archivo basada en extensión
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
+                $allowedMimeTypes = [
+                    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
+                    'image/svg+xml', 'image/webp', 'application/octet-stream'
+                ];
+                
+                // Obtener extensión del nombre original
+                $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+                
+                // Verificar extensión
+                if (!in_array($extension, $allowedExtensions)) {
+                    throw new \Exception('Tipo de archivo no permitido. Solo se permiten: ' . implode(', ', $allowedExtensions));
+                }
+                
+                // Verificar MIME type (más flexible)
+                if (!in_array($mimeType, $allowedMimeTypes)) {
+                    throw new \Exception('Tipo MIME no permitido: ' . $mimeType);
+                }}
                 
                 // Debug: Verificar propiedades del archivo
                 \Log::info('Logo file info:', [
@@ -118,21 +187,9 @@ class VeterinariaController extends Controller
                     'error' => $logoFile->getError()
                 ]);
                 
-                // Verificar que el archivo es válido
-                if (!$logoFile->isValid()) {
-                    throw new \Exception('El archivo de logo no es válido. Error: ' . $logoFile->getError());
-                }
-                
-                // Verificar que el archivo tiene contenido
-                if ($logoFile->getSize() === 0) {
-                    throw new \Exception('El archivo de logo está vacío');
-                }
-                
                 // Obtener extensión de forma segura
-                $extension = $logoFile->getClientOriginalExtension();
                 if (empty($extension)) {
                     // Fallback: obtener extensión desde el mime type
-                    $mimeType = $logoFile->getMimeType();
                     $extension = match($mimeType) {
                         'image/jpeg' => 'jpg',
                         'image/png' => 'png',
@@ -160,7 +217,7 @@ class VeterinariaController extends Controller
                 // Mover el archivo manualmente
                 $fullPath = $destinationPath . DIRECTORY_SEPARATOR . $filename;
                 
-                if (move_uploaded_file($logoFile->getPathname(), $fullPath)) {
+                if (move_uploaded_file($tempPath, $fullPath)) {
                     $path = 'logos/' . $filename;
                     \Log::info('File moved successfully to: ' . $fullPath);
                 } else {
@@ -319,6 +376,16 @@ class VeterinariaController extends Controller
 
         $data = $request->except(['repetir_password', 'password']);
         $hashedPassword = null;
+
+        // Debug: Log de información del request
+        \Log::info('Update request debug info:', [
+            'has_file_logo' => $request->hasFile('logo'),
+            'filled_logo' => $request->filled('logo'),
+            'all_files' => $request->allFiles(),
+            'all_input' => $request->except(['password', 'repetir_password']),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method()
+        ]);
 
         // Solo actualizar contraseña si se proporciona
         if ($request->filled('password')) {
