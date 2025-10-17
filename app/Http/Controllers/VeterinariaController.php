@@ -332,15 +332,106 @@ class VeterinariaController extends Controller
             $data['password'] = $hashedPassword;
         }
 
-        // Manejo de logo: aceptar archivo o URL
-        if ($request->hasFile('logo')) {
-            // Validar y almacenar archivo de imagen en storage/public/logos
-            $request->validate([
-                'logo' => 'image|mimes:jpg,jpeg,png,gif,svg,webp|max:5120'
-            ]);
-            $filename = time() . '_' . uniqid() . '.' . $request->file('logo')->getClientOriginalExtension();
-            $path = $request->file('logo')->storeAs('logos', $filename, 'public');
-            $data['logo'] = $filename;
+        // Manejo mejorado de logo: aceptar archivo o URL
+        if ($request->hasFile('logo') && $request->file('logo')->isValid()) {
+            try {
+                // Validar archivo de imagen
+                $request->validate([
+                    'logo' => 'required|image|mimes:jpg,jpeg,png,gif,svg,webp|max:5120' // 5MB máximo
+                ]);
+
+                $logoFile = $request->file('logo');
+                
+                // Debug: Verificar propiedades del archivo
+                \Log::info('Logo file info (update):', [
+                    'original_name' => $logoFile->getClientOriginalName(),
+                    'mime_type' => $logoFile->getMimeType(),
+                    'size' => $logoFile->getSize(),
+                    'path' => $logoFile->getPathname(),
+                    'is_valid' => $logoFile->isValid(),
+                    'error' => $logoFile->getError()
+                ]);
+                
+                // Verificar que el archivo es válido
+                if (!$logoFile->isValid()) {
+                    throw new \Exception('El archivo de logo no es válido. Error: ' . $logoFile->getError());
+                }
+                
+                // Verificar que el archivo tiene contenido
+                if ($logoFile->getSize() === 0) {
+                    throw new \Exception('El archivo de logo está vacío');
+                }
+                
+                // Obtener extensión de forma segura
+                $extension = $logoFile->getClientOriginalExtension();
+                if (empty($extension)) {
+                    // Fallback: obtener extensión desde el mime type
+                    $mimeType = $logoFile->getMimeType();
+                    $extension = match($mimeType) {
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                        'image/gif' => 'gif',
+                        'image/svg+xml' => 'svg',
+                        'image/webp' => 'webp',
+                        default => 'jpg'
+                    };
+                }
+                
+                // Generar nombre único para el archivo
+                $filename = time() . '_' . uniqid() . '.' . $extension;
+                
+                // Crear directorio si no existe
+                Storage::disk('public')->makeDirectory('logos');
+                
+                // Método alternativo: usar move en lugar de putFileAs
+                $destinationPath = storage_path('app/public/logos');
+                
+                // Asegurar que el directorio existe
+                if (!file_exists($destinationPath)) {
+                    mkdir($destinationPath, 0755, true);
+                }
+                
+                // Eliminar logo anterior si existe y no es una URL
+                if ($veterinaria->logo && !filter_var($veterinaria->logo, FILTER_VALIDATE_URL)) {
+                    $oldLogoPath = $destinationPath . DIRECTORY_SEPARATOR . $veterinaria->logo;
+                    if (file_exists($oldLogoPath)) {
+                        unlink($oldLogoPath);
+                        \Log::info('Old logo deleted: ' . $oldLogoPath);
+                    }
+                }
+                
+                // Mover el archivo manualmente
+                $fullPath = $destinationPath . DIRECTORY_SEPARATOR . $filename;
+                
+                if (move_uploaded_file($logoFile->getPathname(), $fullPath)) {
+                    $path = 'logos/' . $filename;
+                    \Log::info('File moved successfully to: ' . $fullPath);
+                } else {
+                    throw new \Exception('Error al mover el archivo de logo');
+                }
+                
+                // Verificar que el archivo se guardó correctamente
+                if (!file_exists($fullPath)) {
+                    throw new \Exception('Error: el archivo no se encontró después de guardarlo en: ' . $fullPath);
+                }
+                
+                // Guardar solo el nombre del archivo para compatibilidad con el accessor
+                $data['logo'] = $filename;
+                
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $e->errors(),
+                    'message' => 'Error de validación del archivo'
+                ], 422);
+            } catch (\Exception $e) {
+                \Log::error('Error uploading logo (update): ' . $e->getMessage());
+                return response()->json([
+                    'success' => false,
+                    'errors' => ['logo' => ['Error al procesar el archivo de logo: ' . $e->getMessage()]],
+                    'message' => 'Error al subir el logo'
+                ], 422);
+            }
         } elseif ($request->filled('logo')) {
             // Validar URL remota
             if (!filter_var($request->logo, FILTER_VALIDATE_URL)) {
@@ -395,6 +486,15 @@ class VeterinariaController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
+            
+            // Si hubo error y se subió un archivo, eliminarlo
+            if (isset($data['logo']) && !filter_var($data['logo'], FILTER_VALIDATE_URL)) {
+                $logoPath = storage_path('app/public/logos/' . $data['logo']);
+                if (file_exists($logoPath)) {
+                    unlink($logoPath);
+                    \Log::info('Logo file deleted due to rollback: ' . $logoPath);
+                }
+            }
             
             return response()->json([
                 'success' => false,
