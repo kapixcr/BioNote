@@ -316,6 +316,21 @@ class PruebaController extends Controller
         // Ordenar por fecha descendente y paginar
         $pruebas = $query->orderByDesc('fecha')->paginate($perPage);
 
+        // Transformar los datos para convertir arrays a strings para compatibilidad con Flutter
+        $pruebas->getCollection()->transform(function ($prueba) {
+            // Convertir result_prueba de array a string separado por comas
+            if (is_array($prueba->result_prueba)) {
+                $prueba->result_prueba = implode(', ', $prueba->result_prueba);
+            }
+            
+            // Convertir titulacion de array a string si existe
+            if (is_array($prueba->titulacion)) {
+                $prueba->titulacion = implode(', ', $prueba->titulacion);
+            }
+            
+            return $prueba;
+        });
+
         return response()->json([
             'success' => true,
             'data' => $pruebas,
