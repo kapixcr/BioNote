@@ -276,6 +276,13 @@ class PruebaController extends Controller
                 'message' => 'Usuario no autenticado'
             ], 401);
         }
+        // Bloquear acceso si es admin
+        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado'
+            ], 403);
+        }
 
         $perPage = (int)($request->query('per_page', 15));
         
