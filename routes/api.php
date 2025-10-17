@@ -81,9 +81,9 @@ Route::prefix('users')->group(function () {
 // Rutas protegidas para pruebas (CRU)
 Route::prefix('pruebas')->group(function () {
     Route::get('/', [PruebaController::class, 'index']);
-    Route::get('/{id}', [PruebaController::class, 'show']);
-    Route::get('/my-pruebas', [PruebaController::class, 'myPruebas']); // Nueva ruta para pruebas del usuario
+    Route::get('/{id}', [PruebaController::class, 'show'])->whereNumber('id');
+    Route::get('/my-pruebas', [PruebaController::class, 'myPruebas'])->middleware('auth:admin');
     Route::post('/', [PruebaController::class, 'store']);
-    Route::put('/{id}', [PruebaController::class, 'update']);
-    Route::delete('/{id}', [PruebaController::class, 'destroy']);
+    Route::put('/{id}', [PruebaController::class, 'update'])->whereNumber('id');
+    Route::delete('/{id}', [PruebaController::class, 'destroy'])->whereNumber('id');
 });
