@@ -261,7 +261,56 @@ class PruebaController extends Controller
             'data' => $prueba
         ]);
     }
+ /**
+     * Listar pruebas del usuario autenticado con filtros y paginación.
+     */
+    public function myPruebas(Request $request): JsonResponse
+    {
+        // Obtener el usuario autenticado
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no autenticado'
+            ], 401);
+        }
 
+        $perPage = (int)($request->query('per_page', 15));
+        
+        // Crear query base filtrado por el usuario autenticado
+        $query = Prueba::where('user_id', $user->id);
+
+        // Aplicar filtros adicionales si se proporcionan
+        if ($request->filled('especie')) {
+            $query->where('especie', 'like', '%' . $request->query('especie') . '%');
+        }
+
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fecha', '>=', $request->query('fecha_desde'));
+        }
+
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fecha', '<=', $request->query('fecha_hasta'));
+        }
+
+        if ($request->filled('nombre_mascota')) {
+            $query->where('nombre_mascota', 'like', '%' . $request->query('nombre_mascota') . '%');
+        }
+
+        if ($request->filled('nombre_prueba')) {
+            $query->where('nombre_prueba', 'like', '%' . $request->query('nombre_prueba') . '%');
+        }
+
+        // Ordenar por fecha descendente y paginar
+        $pruebas = $query->orderByDesc('fecha')->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $pruebas,
+            'user_id' => $user->id
+        ]);
+    }
     /**
      * Eliminar una prueba.
      */
