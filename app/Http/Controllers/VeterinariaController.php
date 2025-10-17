@@ -375,15 +375,35 @@ class VeterinariaController extends Controller
         $data = $request->except(['repetir_password', 'password']);
         $hashedPassword = null;
 
-        // Debug: Log de información del request
+        // Debug: Log de información detallada del request
+        \Log::info('=== UPDATE REQUEST DEBUG START ===');
         \Log::info('Update request debug info:', [
+            'veterinaria_id' => $id,
             'has_file_logo' => $request->hasFile('logo'),
             'filled_logo' => $request->filled('logo'),
             'all_files' => $request->allFiles(),
             'all_input' => $request->except(['password', 'repetir_password']),
             'content_type' => $request->header('Content-Type'),
-            'method' => $request->method()
+            'method' => $request->method(),
+            'raw_files' => $_FILES,
+            'request_size' => $request->header('Content-Length'),
+            'user_agent' => $request->header('User-Agent')
         ]);
+        
+        // Log específico de $_FILES para debugging
+        if (isset($_FILES['logo'])) {
+            \Log::info('$_FILES[logo] details:', [
+                'name' => $_FILES['logo']['name'] ?? 'not_set',
+                'type' => $_FILES['logo']['type'] ?? 'not_set', 
+                'size' => $_FILES['logo']['size'] ?? 'not_set',
+                'tmp_name' => $_FILES['logo']['tmp_name'] ?? 'not_set',
+                'error' => $_FILES['logo']['error'] ?? 'not_set',
+                'error_message' => $this->getUploadErrorMessage($_FILES['logo']['error'] ?? -1)
+            ]);
+        } else {
+            \Log::info('$_FILES[logo] not found in request');
+        }
+        \Log::info('=== UPDATE REQUEST DEBUG END ===');
 
         // Solo actualizar contraseña si se proporciona
         if ($request->filled('password')) {
@@ -733,5 +753,23 @@ class VeterinariaController extends Controller
             'data' => Veterinaria::getPaisesValidos(),
             'message' => 'Países obtenidos exitosamente'
         ]);
+    }
+
+    /**
+     * Obtener mensaje de error de upload
+     */
+    private function getUploadErrorMessage($errorCode): string
+    {
+        return match($errorCode) {
+            UPLOAD_ERR_OK => 'No error',
+            UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
+            UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
+            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
+            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
+            UPLOAD_ERR_EXTENSION => 'File upload stopped by extension',
+            default => 'Unknown error code: ' . $errorCode
+        };
     }
 }
