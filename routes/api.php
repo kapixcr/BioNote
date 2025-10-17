@@ -49,6 +49,8 @@ Route::middleware('auth:api,admin')->group(function () {
         Route::get('/', [VeterinariaController::class, 'index']);
         Route::get('/{id}', [VeterinariaController::class, 'show']);
         Route::put('/{id}', [VeterinariaController::class, 'update']);
+        // Ruta POST alternativa para actualización con archivos (method spoofing)
+        Route::post('/{id}/update', [VeterinariaController::class, 'update']);
         Route::delete('/{id}', [VeterinariaController::class, 'destroy']);
     });
 

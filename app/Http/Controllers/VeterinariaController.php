@@ -336,9 +336,18 @@ class VeterinariaController extends Controller
      */
     public function update(Request $request, string $id): JsonResponse
     {
+        // Log de entrada para verificar que la request llega al método
+        \Log::info('=== UPDATE METHOD CALLED ===', [
+            'veterinaria_id' => $id,
+            'timestamp' => now(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->header('User-Agent')
+        ]);
+        
         $actor = $request->user();
         if ($actor instanceof User) {
             if (!$actor->isAdmin()) {
+                \Log::warning('Update failed: User not admin');
                 return response()->json([
                     'success' => false,
                     'message' => 'No autorizado'
@@ -346,6 +355,7 @@ class VeterinariaController extends Controller
             }
         } else {
             if ((int) $id !== (int) $actor->id) {
+                \Log::warning('Update failed: Veterinaria ID mismatch');
                 return response()->json([
                     'success' => false,
                     'message' => 'No autorizado'
