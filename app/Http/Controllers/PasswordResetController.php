@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Models\Veterinaria;
 
 class PasswordResetController extends Controller
 {
@@ -77,8 +79,21 @@ class PasswordResetController extends Controller
             $status = Password::reset(
                 $request->only('email', 'password', 'password_confirmation', 'token'),
                 function ($user, $password) {
-                    $user->password = $password;
+                    // Asegurar hash correcto del password para el modelo User
+                    $hashed = Hash::make($password);
+                    $user->password = $hashed;
                     $user->save();
+
+                    // Sincronizar contraseña en Veterinaria si comparten el mismo email
+                    $veterinaria = Veterinaria::where('email', $user->email)->first();
+                    if ($veterinaria) {
+                        $veterinaria->password = $hashed;
+                        $veterinaria->save();
+                        Log::info('Password sincronizado en Veterinaria tras reset por email', [
+                            'user_id' => $user->id,
+                            'veterinaria_id' => $veterinaria->id,
+                        ]);
+                    }
                 }
             );
 
