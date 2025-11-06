@@ -7,6 +7,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\PruebaController;
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\PasswordResetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,10 @@ use App\Http\Controllers\AdminAuthController;
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']); // veterinaria
 });
+
+// Recuperación de contraseña (usuarios)
+Route::post('/forgot-password', [PasswordResetController::class, 'forgot']);
+Route::post('/reset-password', [PasswordResetController::class, 'reset']);
 
 // NUEVO: rutas públicas de autenticación para admin
 Route::prefix('auth/admin')->group(function () {

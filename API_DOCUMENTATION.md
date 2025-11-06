@@ -100,6 +100,103 @@ Registra una nueva veterinaria en el sistema.
 
 **Headers:**
 ```
+
+### 5. Recuperación de Contraseña (Usuarios)
+
+Este flujo permite solicitar un enlace de restablecimiento de contraseña por correo y realizar el cambio utilizando un token válido por 24 horas.
+
+#### Solicitar enlace de restablecimiento
+**POST** `/forgot-password`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Parámetros:**
+```json
+{
+  "email": "usuario@example.com"
+}
+```
+
+**Respuesta (siempre genérica):**
+```json
+{
+  "success": true,
+  "message": "Si el correo existe, se ha enviado un enlace para restablecer la contraseña."
+}
+```
+
+Notas de seguridad:
+- La respuesta no confirma si el correo existe para evitar enumeración de cuentas.
+- Límite de solicitudes por IP y email para mitigar fuerza bruta.
+- Throttle de 5 minutos entre generaciones de tokens por usuario.
+
+#### Restablecer contraseña
+**POST** `/reset-password`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Parámetros:**
+```json
+{
+  "email": "usuario@example.com",
+  "token": "TOKEN_DEL_CORREO",
+  "password": "NuevaPassword123",
+  "password_confirmation": "NuevaPassword123"
+}
+```
+
+**Respuesta exitosa:**
+```json
+{
+  "success": true,
+  "message": "Contraseña restablecida exitosamente."
+}
+```
+
+**Errores comunes:**
+- 422: Token inválido o expirado.
+- 429: Demasiados intentos.
+- 500: Error interno al restablecer.
+
+#### Flujo de trabajo
+1. El usuario envía su `email` a `/forgot-password`.
+2. El sistema genera un token único e impredecible con validez de 24 horas.
+3. Se envía un correo con un enlace de restablecimiento (`RESET_PASSWORD_URL` o `APP_URL` + `/reset-password`).
+4. El usuario abre el enlace, envía `email`, `token`, `password` y `password_confirmation` a `/reset-password`.
+5. Si el token es válido, se actualiza la contraseña y se invalida el token.
+
+#### Plantilla de correo
+El correo incluye:
+- Enlace seguro con el token.
+- Instrucciones claras para restablecer la contraseña.
+- Información de seguridad: no compartir el enlace, uso único, expira en 24 horas.
+
+#### Configuración de correo
+Variables relevantes en `.env`:
+```
+MAIL_MAILER=smtp
+MAIL_HOST=mailhog
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS="no-reply@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+# URL opcional de frontend para el enlace
+RESET_PASSWORD_URL=
+```
+
+#### Seguridad adicional
+- Tokens no predecibles y de un solo uso (Laravel Password Broker).
+- Rate limiting por IP y correo.
+- Logging sin datos sensibles (hash del email, estado y errores).
 Content-Type: application/json
 ```
 
