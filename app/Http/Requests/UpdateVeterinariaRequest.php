@@ -39,7 +39,7 @@ class UpdateVeterinariaRequest extends FormRequest
             'registro_oficial_veterinario' => 'required|string|max:255',
             'ciudad' => 'required|string|max:255',
             'provincia_departamento' => 'required|string|max:255',
-            'pais' => ['required', Rule::in(Veterinaria::getPaisesValidos())],
+            'pais' => 'required|string|max:255',
             'logo' => 'nullable|url|max:500',
             'usuario' => [
                 'required',

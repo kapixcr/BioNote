@@ -803,7 +803,7 @@ class VeterinariaController extends Controller
                 'registro_oficial_veterinario' => 'sometimes|required|string|max:255',
                 'ciudad' => 'sometimes|required|string|max:255',
                 'provincia_departamento' => 'sometimes|required|string|max:255',
-                'pais' => ['sometimes', 'required', Rule::in(Veterinaria::getPaisesValidos())],
+                'pais' => 'sometimes|required|string|max:255',
                 'logo' => 'sometimes|nullable',
                 'usuario' => [
                     'sometimes',
@@ -831,7 +831,7 @@ class VeterinariaController extends Controller
                 'registro_oficial_veterinario' => 'required|string|max:255',
                 'ciudad' => 'required|string|max:255',
                 'provincia_departamento' => 'required|string|max:255',
-                'pais' => ['required', Rule::in(Veterinaria::getPaisesValidos())],
+                'pais' => 'required|string|max:255',
                 'logo' => 'nullable',
                 'usuario' => [
                     'required',
