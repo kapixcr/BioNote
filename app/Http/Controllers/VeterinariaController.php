@@ -68,18 +68,50 @@ class VeterinariaController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // Log de inicio del registro
+        \Log::info('=== INICIO REGISTRO VETERINARIA ===', [
+            'timestamp' => now(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->header('User-Agent'),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method(),
+        ]);
+
+        // Log de todos los datos recibidos (sin contraseñas)
+        $requestData = $request->except(['password', 'repetir_password']);
+        \Log::info('Datos recibidos en registro:', [
+            'datos' => $requestData,
+            'has_password' => $request->has('password'),
+            'has_repetir_password' => $request->has('repetir_password'),
+            'acepta_terminos' => $request->input('acepta_terminos'),
+            'acepta_tratamiento_datos' => $request->input('acepta_tratamiento_datos'),
+        ]);
+
         $validator = $this->validateVeterinaria($request);
 
         if ($validator->fails()) {
+            // Log detallado de errores de validación
+            $errors = $validator->errors();
+            \Log::error('ERROR DE VALIDACIÓN EN REGISTRO VETERINARIA:', [
+                'errors' => $errors->toArray(),
+                'errors_count' => $errors->count(),
+                'failed_rules' => $errors->all(),
+                'datos_enviados' => $requestData,
+            ]);
+
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors(),
+                'errors' => $errors,
                 'message' => 'Error de validación'
             ], 422);
         }
 
         // Verificar que las contraseñas coincidan
         if ($request->password !== $request->repetir_password) {
+            \Log::warning('ERROR: Las contraseñas no coinciden en registro', [
+                'password_length' => strlen($request->password ?? ''),
+                'repetir_password_length' => strlen($request->repetir_password ?? ''),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Las contraseñas no coinciden'
@@ -88,6 +120,12 @@ class VeterinariaController extends Controller
 
         // Verificar términos y condiciones
         if (!$request->acepta_terminos || !$request->acepta_tratamiento_datos) {
+            \Log::warning('ERROR: Términos y condiciones no aceptados', [
+                'acepta_terminos' => $request->acepta_terminos,
+                'acepta_tratamiento_datos' => $request->acepta_tratamiento_datos,
+                'acepta_terminos_type' => gettype($request->acepta_terminos),
+                'acepta_tratamiento_datos_type' => gettype($request->acepta_tratamiento_datos),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Debe aceptar los términos y condiciones y el tratamiento de datos'
@@ -260,17 +298,36 @@ class VeterinariaController extends Controller
         DB::beginTransaction();
         
         try {
+            \Log::info('Intentando crear veterinaria en base de datos...', [
+                'email' => $request->email,
+                'usuario' => $request->usuario,
+            ]);
+
             // Crear la veterinaria
             $veterinaria = Veterinaria::create($data);
+            \Log::info('Veterinaria creada exitosamente', [
+                'veterinaria_id' => $veterinaria->id,
+                'email' => $veterinaria->email,
+            ]);
 
             // Crear el usuario correspondiente en la tabla users
-            User::create([
+            \Log::info('Intentando crear usuario en tabla users...');
+            $user = User::create([
                 'name' => $request->responsable,
                 'email' => $request->email,
                 'password' => $hashedPassword,
             ]);
+            \Log::info('Usuario creado exitosamente', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
 
             DB::commit();
+
+            \Log::info('=== REGISTRO VETERINARIA EXITOSO ===', [
+                'veterinaria_id' => $veterinaria->id,
+                'user_id' => $user->id,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -280,6 +337,16 @@ class VeterinariaController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
+            
+            // Log detallado del error
+            \Log::error('ERROR AL REGISTRAR VETERINARIA:', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'email' => $request->email ?? 'no_provided',
+                'usuario' => $request->usuario ?? 'no_provided',
+            ]);
             
             // Si hubo error y se subió un archivo, eliminarlo
             if (isset($data['logo']) && !filter_var($data['logo'], FILTER_VALIDATE_URL)) {
@@ -714,6 +781,11 @@ class VeterinariaController extends Controller
         // Para actualizaciones, solo validar campos que se están enviando
         $isUpdate = !is_null($id);
         
+        \Log::info('Iniciando validación de veterinaria', [
+            'is_update' => $isUpdate,
+            'id' => $id,
+        ]);
+        
         if ($isUpdate) {
             $rules = [
                 'veterinaria' => 'sometimes|required|string|max:255',
@@ -778,7 +850,35 @@ class VeterinariaController extends Controller
             $rules['repetir_password'] = 'required|string|min:8';
         }
 
-        return Validator::make($request->all(), $rules);
+        // Log de las reglas de validación que se aplicarán
+        \Log::info('Reglas de validación aplicadas:', [
+            'rules' => $rules,
+            'campos_en_request' => array_keys($request->all()),
+        ]);
+
+        $validator = Validator::make($request->all(), $rules);
+        
+        // Log de los valores recibidos para cada campo requerido
+        if (!$isUpdate) {
+            \Log::info('Valores recibidos para validación (registro nuevo):', [
+                'veterinaria' => $request->input('veterinaria'),
+                'responsable' => $request->input('responsable'),
+                'direccion' => $request->input('direccion'),
+                'telefono' => $request->input('telefono'),
+                'email' => $request->input('email'),
+                'registro_oficial_veterinario' => $request->input('registro_oficial_veterinario'),
+                'ciudad' => $request->input('ciudad'),
+                'provincia_departamento' => $request->input('provincia_departamento'),
+                'pais' => $request->input('pais'),
+                'usuario' => $request->input('usuario'),
+                'acepta_terminos' => $request->input('acepta_terminos'),
+                'acepta_tratamiento_datos' => $request->input('acepta_tratamiento_datos'),
+                'password' => $request->has('password') ? '***' : null,
+                'repetir_password' => $request->has('repetir_password') ? '***' : null,
+            ]);
+        }
+
+        return $validator;
     }
 
 
