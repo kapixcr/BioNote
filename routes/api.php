@@ -37,6 +37,8 @@ Route::post('/auth/firebase/reset-password', [FirebasePasswordResetController::c
 // NUEVO: rutas públicas de autenticación para admin
 Route::prefix('auth/admin')->group(function () {
     Route::post('/login', [AdminAuthController::class, 'login']);
+    // Endpoint temporal de debugging (remover en producción)
+    Route::get('/debug-auth', [AdminAuthController::class, 'debugAuth']);
 });
 
 // Rutas públicas para veterinarias
@@ -72,7 +74,7 @@ Route::middleware('auth:api,admin')->group(function () {
 });
 
 // Rutas protegidas exclusivamente para admin (users CRUD y gestión de roles)
-Route::prefix('users')->middleware('auth:admin')->group(function () {
+Route::prefix('users')->middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/{id}', [UserController::class, 'show']);
     Route::put('/{id}', [UserController::class, 'update']);

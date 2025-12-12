@@ -84,6 +84,67 @@ class AdminAuthController extends Controller
     }
 
     /**
+     * Endpoint de debugging para verificar autenticación (temporal)
+     */
+    public function debugAuth(Request $request): JsonResponse
+    {
+        $authHeader = $request->header('Authorization');
+        $token = $authHeader ? substr($authHeader, 7) : null;
+
+        $debug = [
+            'has_auth_header' => $request->hasHeader('Authorization'),
+            'auth_header' => $authHeader ? substr($authHeader, 0, 30) . '...' : null,
+            'token_preview' => $token ? substr($token, 0, 20) . '...' : null,
+            'auth_admin_user' => auth('admin')->check() ? [
+                'id' => auth('admin')->id(),
+                'email' => auth('admin')->user()->email ?? null,
+                'role' => auth('admin')->user()->role ?? null,
+            ] : null,
+            'request_user' => $request->user() ? [
+                'id' => $request->user()->id,
+                'email' => $request->user()->email,
+                'role' => $request->user()->role,
+                'class' => get_class($request->user()),
+            ] : null,
+        ];
+
+        // Intentar encontrar el token en la base de datos
+        if ($token) {
+            try {
+                $tokenModel = \Laravel\Sanctum\PersonalAccessToken::findToken($token);
+                if ($tokenModel) {
+                    $debug['token_info'] = [
+                        'id' => $tokenModel->id,
+                        'name' => $tokenModel->name,
+                        'abilities' => $tokenModel->abilities,
+                        'tokenable_type' => $tokenModel->tokenable_type,
+                        'tokenable_id' => $tokenModel->tokenable_id,
+                        'created_at' => $tokenModel->created_at,
+                    ];
+                    
+                    if ($tokenModel->tokenable) {
+                        $debug['token_info']['tokenable'] = [
+                            'id' => $tokenModel->tokenable->id,
+                            'email' => $tokenModel->tokenable->email ?? null,
+                            'role' => $tokenModel->tokenable->role ?? null,
+                            'class' => get_class($tokenModel->tokenable),
+                        ];
+                    }
+                } else {
+                    $debug['token_info'] = 'Token no encontrado en la base de datos';
+                }
+            } catch (\Exception $e) {
+                $debug['token_error'] = $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'debug' => $debug,
+        ]);
+    }
+
+    /**
      * Actualizar el role de un usuario
      */
     public function updateRole(Request $request, string $id): JsonResponse
