@@ -69,19 +69,16 @@ Route::middleware('auth:api,admin')->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout']);
         Route::get('/me', [AdminAuthController::class, 'me']);
     });
-
-    // Ruta para actualizar el role de un usuario (solo admin)
-    Route::prefix('users')->middleware('auth:admin')->group(function () {
-        Route::put('/{id}/role', [AdminAuthController::class, 'updateRole']);
-    });
 });
 
-// Rutas protegidas exclusivamente para admin (users CRUD)
+// Rutas protegidas exclusivamente para admin (users CRUD y gestión de roles)
 Route::prefix('users')->middleware('auth:admin')->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::get('/{id}', [UserController::class, 'show']);
     Route::put('/{id}', [UserController::class, 'update']);
     Route::delete('/{id}', [UserController::class, 'destroy']);
+    // Ruta para actualizar el role de un usuario (solo admin)
+    Route::put('/{id}/role', [AdminAuthController::class, 'updateRole']);
 });
 
 // Rutas protegidas para usuarios
