@@ -81,4 +81,47 @@ class AdminAuthController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Actualizar el role de un usuario
+     */
+    public function updateRole(Request $request, string $id): JsonResponse
+    {
+        // Validar que el role sea proporcionado y válido
+        $request->validate([
+            'role' => 'required|string|in:user,admin',
+        ]);
+
+        $user = User::find($id);
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ], 404);
+        }
+
+        try {
+            $user->update([
+                'role' => $request->role
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Role del usuario actualizado exitosamente',
+                'data' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar el role: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

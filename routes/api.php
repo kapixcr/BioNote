@@ -8,6 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\PruebaController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\FirebasePasswordResetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,6 +29,10 @@ Route::prefix('auth')->group(function () {
 // Recuperación de contraseña (usuarios)
 Route::post('/forgot-password', [PasswordResetController::class, 'forgot']);
 Route::post('/reset-password', [PasswordResetController::class, 'reset']);
+
+// Firebase OTP (Phone Auth) para reseteo de contraseña de Veterinaria
+Route::post('/auth/firebase/verify', [FirebasePasswordResetController::class, 'verify']);
+Route::post('/auth/firebase/reset-password', [FirebasePasswordResetController::class, 'reset']);
 
 // NUEVO: rutas públicas de autenticación para admin
 Route::prefix('auth/admin')->group(function () {
@@ -63,6 +68,11 @@ Route::middleware('auth:api,admin')->group(function () {
     Route::prefix('auth/admin')->middleware('auth:admin')->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout']);
         Route::get('/me', [AdminAuthController::class, 'me']);
+    });
+
+    // Ruta para actualizar el role de un usuario (solo admin)
+    Route::prefix('users')->middleware('auth:admin')->group(function () {
+        Route::put('/{id}/role', [AdminAuthController::class, 'updateRole']);
     });
 });
 

@@ -159,6 +159,9 @@ Content-Type: application/json
 }
 ```
 
+Nota:
+- Si el correo está asociado tanto a un `User` como a una `Veterinaria` (cuentas compartidas), el cambio de contraseña se sincroniza en ambos modelos.
+
 **Errores comunes:**
 - 422: Token inválido o expirado.
 - 429: Demasiados intentos.
@@ -197,6 +200,108 @@ RESET_PASSWORD_URL=
 - Tokens no predecibles y de un solo uso (Laravel Password Broker).
 - Rate limiting por IP y correo.
 - Logging sin datos sensibles (hash del email, estado y errores).
+
+### 6. Recuperación de Contraseña con Firebase OTP (Veterinarias)
+
+Este flujo permite restablecer la contraseña de una cuenta de Veterinaria verificando un `idToken` de Firebase Phone Auth y usando un token de sesión temporal.
+
+#### Verificar idToken y obtener token de sesión
+**POST** `/auth/firebase/verify`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Parámetros:**
+```json
+{
+  "idToken": "ID_TOKEN_DEVUELTO_POR_FIREBASE"
+}
+```
+
+**Respuesta exitosa (cuenta encontrada):**
+```json
+{
+  "success": true,
+  "session_token": "c3f6d0b1...",
+  "expires_in_minutes": 10
+}
+```
+
+**Respuesta genérica (no se revela existencia):**
+```json
+{
+  "success": true,
+  "message": "Verificación realizada. Si existe una cuenta, podrás continuar."
+}
+```
+
+Notas:
+- El token debe ser un `idToken` válido emitido por Firebase para autenticación por teléfono.
+- Se limita a 5 intentos por 10 minutos por IP.
+
+#### Restablecer contraseña con token de sesión
+**POST** `/auth/firebase/reset-password`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Parámetros:**
+```json
+{
+  "session_token": "c3f6d0b1...",
+  "password": "NuevaPassword123",
+  "password_confirmation": "NuevaPassword123"
+}
+```
+
+**Respuesta exitosa:**
+```json
+{
+  "success": true,
+  "message": "Contraseña actualizada exitosamente."
+}
+```
+
+Nota:
+- Cuando la cuenta de `Veterinaria` comparte email con un `User`, el cambio de contraseña se sincroniza también en el `User` correspondiente.
+
+**Errores comunes:**
+- 400: Token de sesión inválido o expirado.
+- 429: Demasiados intentos.
+- 404: Cuenta no disponible.
+
+#### Alternativa: restablecer directamente con `idToken`
+Puedes omitir el paso de verificación y enviar el `idToken` directamente al endpoint de reset.
+
+**POST** `/auth/firebase/reset-password`
+
+**Parámetros:**
+```json
+{
+  "idToken": "ID_TOKEN_DEVUELTO_POR_FIREBASE",
+  "password": "NuevaPassword123",
+  "password_confirmation": "NuevaPassword123"
+}
+```
+
+Notas:
+- El `idToken` debe contener `phone_number` (Phone Auth).
+- Se buscará la cuenta de Veterinaria cuyo `telefono` coincida exactamente con el `phone_number` (formato E.164 recomendado, ej. `+50622223333`).
+
+#### Configuración requerida
+Variables relevantes en `.env`:
+```
+FIREBASE_PROJECT_ID=
+```
+
+#### Consideraciones de seguridad
+- El token de sesión expira en 10 minutos y se invalida al usarlo.
+- No se revela explícitamente si existe una cuenta vinculada al número.
+- Se registra actividad sin exponer datos sensibles.
 Content-Type: application/json
 ```
 
