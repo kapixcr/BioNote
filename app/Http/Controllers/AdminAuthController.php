@@ -152,6 +152,22 @@ class AdminAuthController extends Controller
         // Obtener el usuario autenticado
         $authenticatedUser = $request->user();
         
+        // Validar que el usuario esté autenticado
+        if (!$authenticatedUser) {
+            Log::warning('Intento de actualizar role sin autenticación', [
+                'target_user_id' => $id,
+                'new_role' => $request->role ?? 'no proporcionado',
+                'has_auth_header' => $request->hasHeader('Authorization'),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No estás autenticado. Por favor, inicia sesión como administrador.',
+                'error_type' => 'not_authenticated',
+                'hint' => 'Asegúrate de enviar el header: Authorization: Bearer {token}',
+            ], 401);
+        }
+        
         // Log para debugging
         Log::info('Intento de actualización de role', [
             'admin_id' => $authenticatedUser->id,
@@ -162,9 +178,9 @@ class AdminAuthController extends Controller
         ]);
 
         // Validar que el usuario autenticado sea admin
-        if (!$authenticatedUser || !$authenticatedUser->isAdmin()) {
+        if (!$authenticatedUser->isAdmin()) {
             Log::warning('Intento de actualizar role sin permisos de admin', [
-                'user_id' => $authenticatedUser->id ?? 'no autenticado',
+                'user_id' => $authenticatedUser->id,
                 'user_role' => $authenticatedUser->role ?? 'no definido',
             ]);
 

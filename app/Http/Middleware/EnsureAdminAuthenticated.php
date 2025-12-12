@@ -132,6 +132,11 @@ class EnsureAdminAuthenticated
             // Establecer el usuario en el guard admin
             auth('admin')->setUser($user);
             
+            // Establecer el usuario en el request para que $request->user() funcione
+            $request->setUserResolver(function () use ($user) {
+                return $user;
+            });
+            
             Log::info('Usuario autenticado desde token', [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
