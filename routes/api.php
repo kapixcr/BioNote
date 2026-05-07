@@ -9,6 +9,8 @@ use App\Http\Controllers\PruebaController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\FirebasePasswordResetController;
+use App\Http\Controllers\VarianteController;
+use App\Http\Controllers\KitController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,4 +102,22 @@ Route::prefix('pruebas')->group(function () {
     Route::post('/', [PruebaController::class, 'store']);
     Route::put('/{id}', [PruebaController::class, 'update'])->whereNumber('id');
     Route::delete('/{id}', [PruebaController::class, 'destroy'])->whereNumber('id');
+});
+
+// Rutas protegidas para variantes (solo admin)
+Route::prefix('variantes')->middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
+    Route::get('/', [VarianteController::class, 'index']);
+    Route::get('/{id}', [VarianteController::class, 'show']);
+    Route::post('/', [VarianteController::class, 'store']);
+    Route::post('/{id}', [VarianteController::class, 'update']);
+    Route::delete('/{id}', [VarianteController::class, 'destroy']);
+});
+
+// Rutas protegidas para kits (solo admin)
+Route::prefix('kits')->middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
+    Route::get('/', [KitController::class, 'index']);
+    Route::get('/{id}', [KitController::class, 'show']);
+    Route::post('/', [KitController::class, 'store']);
+    Route::put('/{id}', [KitController::class, 'update']);
+    Route::delete('/{id}', [KitController::class, 'destroy']);
 });
