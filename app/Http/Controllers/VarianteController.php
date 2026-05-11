@@ -12,7 +12,17 @@ class VarianteController extends Controller
 {
     public function index(): JsonResponse
     {
-        $variantes = Variante::orderByDesc('created_at')->get();
+        $variantes = Variante::all()->map(function($v) {
+            return [
+                'id' => $v->id,
+                'nombre' => $v->nombre,
+                'es_titulacion' => (bool)$v->es_titulacion,
+                'resultados' => is_array($v->resultados) ? $v->resultados : [],
+                'archivo' => $v->archivo,
+                'created_at' => $v->created_at,
+                'updated_at' => $v->updated_at,
+            ];
+        });
 
         return response()->json([
             'success' => true,
@@ -41,7 +51,8 @@ class VarianteController extends Controller
     {
         $rules = [
             'nombre' => ['required', 'string', 'max:255'],
-            'resultados' => ['required', 'array'],
+            'es_titulacion' => ['sometimes', 'boolean'],
+            'resultados' => ['required_unless:es_titulacion,true,1', 'array'],
             'resultados.*' => ['string', 'in:positivo,negativo,invalido'],
         ];
 
@@ -61,6 +72,10 @@ class VarianteController extends Controller
         }
 
         $data = $validator->validated();
+
+        if (isset($data['es_titulacion']) && ($data['es_titulacion'] == true || $data['es_titulacion'] == 1)) {
+            $data['resultados'] = [];
+        }
 
         if ($request->hasFile('archivo')) {
             $file = $request->file('archivo');
@@ -103,6 +118,7 @@ class VarianteController extends Controller
 
         $rules = [
             'nombre' => ['sometimes', 'string', 'max:255'],
+            'es_titulacion' => ['sometimes', 'boolean'],
             'resultados' => ['sometimes', 'array'],
             'resultados.*' => ['string', 'in:positivo,negativo,invalido'],
         ];
@@ -123,6 +139,10 @@ class VarianteController extends Controller
         }
 
         $data = $validator->validated();
+
+        if (isset($data['es_titulacion']) && ($data['es_titulacion'] == true || $data['es_titulacion'] == 1)) {
+            $data['resultados'] = [];
+        }
 
         if ($request->hasFile('archivo')) {
             $file = $request->file('archivo');

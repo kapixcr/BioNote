@@ -13,11 +13,13 @@ class Variante extends Model
 
     protected $fillable = [
         'nombre',
+        'es_titulacion',
         'resultados',
         'archivo',
     ];
 
     protected $casts = [
+        'es_titulacion' => 'boolean',
         'resultados' => 'array',
     ];
 
