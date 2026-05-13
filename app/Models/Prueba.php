@@ -13,6 +13,7 @@ class Prueba extends Model
 
     protected $fillable = [
         'user_id',
+        'veterinaria_id',
         'fecha',
         'especie',
         'nombre_mascota',
@@ -36,5 +37,10 @@ class Prueba extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function veterinaria()
+    {
+        return $this->belongsTo(Veterinaria::class);
     }
 }

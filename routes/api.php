@@ -104,20 +104,34 @@ Route::prefix('pruebas')->group(function () {
     Route::delete('/{id}', [PruebaController::class, 'destroy'])->whereNumber('id');
 });
 
-// Rutas protegidas para variantes (solo admin)
-Route::prefix('variantes')->middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
-    Route::get('/', [VarianteController::class, 'index']);
-    Route::get('/{id}', [VarianteController::class, 'show']);
-    Route::post('/', [VarianteController::class, 'store']);
-    Route::post('/{id}', [VarianteController::class, 'update']);
-    Route::delete('/{id}', [VarianteController::class, 'destroy']);
+// Rutas protegidas para variantes
+Route::prefix('variantes')->group(function () {
+    // Lectura permitida para todos los autenticados (admin o veterinaria)
+    Route::middleware('auth:api,admin')->group(function () {
+        Route::get('/', [VarianteController::class, 'index']);
+        Route::get('/{id}', [VarianteController::class, 'show']);
+    });
+
+    // Escritura restringida exclusivamente para admin
+    Route::middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
+        Route::post('/', [VarianteController::class, 'store']);
+        Route::post('/{id}', [VarianteController::class, 'update']);
+        Route::delete('/{id}', [VarianteController::class, 'destroy']);
+    });
 });
 
-// Rutas protegidas para kits (solo admin)
-Route::prefix('kits')->middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
-    Route::get('/', [KitController::class, 'index']);
-    Route::get('/{id}', [KitController::class, 'show']);
-    Route::post('/', [KitController::class, 'store']);
-    Route::put('/{id}', [KitController::class, 'update']);
-    Route::delete('/{id}', [KitController::class, 'destroy']);
+// Rutas protegidas para kits
+Route::prefix('kits')->group(function () {
+    // Lectura permitida para todos los autenticados (admin o veterinaria)
+    Route::middleware('auth:api,admin')->group(function () {
+        Route::get('/', [KitController::class, 'index']);
+        Route::get('/{id}', [KitController::class, 'show']);
+    });
+
+    // Escritura restringida exclusivamente para admin
+    Route::middleware(\App\Http\Middleware\EnsureAdminAuthenticated::class)->group(function () {
+        Route::post('/', [KitController::class, 'store']);
+        Route::put('/{id}', [KitController::class, 'update']);
+        Route::delete('/{id}', [KitController::class, 'destroy']);
+    });
 });
