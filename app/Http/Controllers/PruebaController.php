@@ -20,8 +20,26 @@ class PruebaController extends Controller
         $perPage = (int)($request->query('per_page', 15));
         $query = Prueba::query();
 
-        if ($request->filled('user_id')) {
-            $query->where('user_id', $request->query('user_id'));
+        // Obtener el actor autenticado (User o Veterinaria)
+        $actor = Auth::user();
+
+        if ($actor instanceof \App\Models\Veterinaria) {
+            // Si es una veterinaria, solo puede ver sus propias pruebas
+            $query->where('veterinaria_id', $actor->id);
+        } else if ($actor instanceof \App\Models\User) {
+            // Si es un administrador
+            if (!$actor->isAdmin()) {
+                // Si por alguna razón no es admin, solo sus propias pruebas
+                $query->where('user_id', $actor->id);
+            } else {
+                // Si es admin, puede filtrar por user_id o veterinaria_id si se proporcionan
+                if ($request->filled('user_id')) {
+                    $query->where('user_id', $request->query('user_id'));
+                }
+                if ($request->filled('veterinaria_id')) {
+                    $query->where('veterinaria_id', $request->query('veterinaria_id'));
+                }
+            }
         }
 
         if ($request->filled('especie')) {
@@ -36,7 +54,7 @@ class PruebaController extends Controller
             $query->whereDate('fecha', '<=', $request->query('fecha_hasta'));
         }
 
-        $pruebas = $query->orderByDesc('fecha')->paginate($perPage);
+        $pruebas = $query->orderByDesc('fecha')->orderByDesc('created_at')->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -69,7 +87,7 @@ class PruebaController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => ['required', 'exists:users,id'],
+            'user_id' => ['required'],
             'fecha' => ['required', 'date'],
             'especie' => ['required', 'string', 'max:100'],
             'nombre_mascota' => ['required', 'string', 'max:100'],
@@ -78,8 +96,8 @@ class PruebaController extends Controller
             'edad' => ['required', 'integer', 'min:0'],
             'nombre_prueba' => ['required', 'string', 'max:150'],
             'result_prueba' => ['nullable', 'array'],
-            'titulacion' => ['required', 'array'],
-            // 'fotos' se maneja como archivos en multipart/form-data; validación específica abajo
+            'titulacion' => ['nullable', 'array'],
+            'result_titulacion' => ['nullable', 'string'],
             'fotos' => ['nullable', 'array'],
         ]);
 
@@ -91,6 +109,16 @@ class PruebaController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Determinar si el ID es de una Veterinaria o un User
+        $id = $data['user_id'];
+        unset($data['user_id']);
+
+        if (\App\Models\User::where('id', $id)->exists()) {
+            $data['user_id'] = $id;
+        } else {
+            $data['veterinaria_id'] = $id;
+        }
 
         // Validar y almacenar archivos de fotos si se enviaron
         $fotoUrls = [];
